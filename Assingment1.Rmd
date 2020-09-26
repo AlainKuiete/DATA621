@@ -1,0 +1,152 @@
+---
+title: "DATA 621 Homework 1"
+author: "Alain Kuiete"
+date: "9/24/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+## INTRODUCTION
+Study of 2276 professionals baseball teams from 1871 to 2006. There are 16 variables where 15 are predictors.
+## DATA EXPLORATION
+
+```{r}
+library(tidyverse)
+library(psych)
+library(DataExplorer)
+library(GGally)
+library(corrplot)
+library(DMwR)
+library(caret)
+library(VIM)
+library(glmnet)
+library(doParallel)
+library(xgboost) 
+library(mice)
+library(data.table)
+library(kableExtra)
+#Please add any new required packages here:
+```
+
+We can use the command read.csv to import the dataset and view the first six row with the command head().
+
+```{r}
+moneyball <- read.csv("/home/alain/Documents/DATA621/Assignment1/moneyball-training-data.csv")
+moneyball_eval <- read.csv("/home/alain/Documents/DATA621/Assignment1/moneyball-evaluation-data.csv")
+head(moneyball)
+```
+
+```{r}
+library(dplyr)
+moneyball_train <- moneyball[,-c(1,2, 10, 11)] %>% 
+   mutate_all(~ifelse(is.na(.), median(., na.rm = TRUE), .))
+colSums(is.na(moneyball_train))
+```
+
+```{r}
+library(dplyr)
+moneyball_eval_t <- moneyball_eval[,-c(1, 9, 10)] %>% 
+   mutate_all(~ifelse(is.na(.), median(., na.rm = TRUE), .))
+colSums(is.na(moneyball_eval_t))
+```
+
+
+```{r}
+library(DMwR)
+moneyball_train2 <- knnImputation(moneyball[,-c(1,2,10,11)])  # perform knn imputation.
+anyNA(moneyball_train2)
+```
+
+```{r}
+library(DMwR)
+moneyball_eval_t2 <- knnImputation(moneyball_eval[,-c(1,9,10)])  # perform knn imputation.
+anyNA(moneyball_eval_t2)
+```
+
+```{r}
+moneyball_trans2 <- preProcess(moneyball_train2, method = c("BoxCox", "center", "scale", "pca"))
+moneyball_trans2
+```
+
+```{r}
+# Apply the transformations:
+moneyball_transformed2 <- predict(moneyball_trans2, moneyball_train2)
+head(moneyball_transformed2)
+```
+
+
+```{r}
+# Apply the transformations:
+moneyball_eval_tr2 <- predict(moneyball_trans2, moneyball_eval_t2)
+head(moneyball_eval_tr2)
+```
+
+#### By default, the numbers are returned as a list. Using
+#### list = FALSE, a matrix of row numbers is generated.
+#### These samples are allocated to the training set.
+```{r}
+trainingRows <- createDataPartition(moneyball$TARGET_WINS, p = .80, list= FALSE)
+```
+
+
+#### Subset the data into objects for training using
+#### integer sub-setting.
+```{r}
+trainPredictors2 <- moneyball_transformed2[trainingRows, ]
+trainTARGET_WINS <- moneyball$TARGET_WINS[trainingRows]
+```
+
+##### Do the same for the test set using negative integers.
+```{r}
+testPredictors2 <- moneyball_transformed2[-trainingRows, ]
+testTARGET_WINS <- moneyball$TARGET_WINS[-trainingRows]
+
+```
+
+
+```{r}
+set.seed(130)
+ctrl <- trainControl(method = "cv", number = 10)
+lmFit1 <- train(trainPredictors2, trainTARGET_WINS, method = "lm", trControl = ctrl)
+lmFit1
+```
+
+
+```{r}
+lmPred1 <- predict(lmFit1, testPredictors2)
+head(lmPred1)
+```
+```{r}
+lmValues1 <- data.frame(obs = testTARGET_WINS, pred = lmPred1)
+defaultSummary(lmValues1)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

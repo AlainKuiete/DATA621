@@ -1,0 +1,125 @@
+---
+title: "Exercise 8.1"
+author: "Groupe 3"
+date: "6/29/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+8.1. Recreate the simulated data from Exercise 7.2:
+```{r}
+library(mlbench)
+set.seed(200)
+simulated <- mlbench.friedman1(200, sd = 1)
+simulated <- cbind(simulated$x, simulated$y)
+simulated <- as.data.frame(simulated)
+colnames(simulated)[ncol(simulated)] <- "y"
+```
+
+
+(a) Fit a random forest model to all of the predictors, then estimate the
+variable importance scores:
+```{r}
+library(randomForest)
+library(caret)
+model1 <- randomForest(y ~ ., data = simulated,
+importance = TRUE,
+ntree = 1000)
+rfImp1 <- varImp(model1, scale = FALSE)
+```
+
+```{r}
+rfImp1 
+```
+
+
+Did the random forest model significantly use the uninformative predic-
+tors ( V6 – V10 )?
+
+
+(b) Now add an additional predictor that is highly correlated with one of the
+informative predictors. For example:
+```{r}
+simulated$duplicate1 <- simulated$V1 + rnorm(200) * .1
+cor(simulated$duplicate1, simulated$V1)
+```
+
+Fit another random forest model to these data. Did the importance score
+for V1 change? What happens when you add another predictor that is
+also highly correlated with V1 ?
+
+
+(c) Use the cforest function in the party package to fit a random forest model
+using conditional inference trees. The party package function varimp can
+calculate predictor importance. The conditional argument of that func-
+tion toggles between the traditional importance measure and the modified
+version described in Strobl et al. (2007). Do these importances show the
+same pattern as the traditional random forest model?
+
+
+(d) Repeat this process with different tree models, such as boosted trees and
+Cubist. Does the same pattern occur?8.8 Computing
+219
+MolWeight
+HydrophilicFactor
+NumAromaticBonds
+NumCarbon
+SurfaceArea1
+NumMultBonds
+NumAtoms
+NumHalogen
+FP172
+SurfaceArea2
+NumNonHAtoms
+NumHydrogen
+NumBonds
+NumRotBonds
+NumNonHBonds
+FP075
+NumRings
+FP015
+FP072
+FP074
+FP107
+FP070
+FP065
+FP044
+FP104
+NumCarbon
+MolWeight
+SurfaceArea2
+SurfaceArea1
+HydrophilicFactor
+NumNonHAtoms
+NumBonds
+NumHydrogen
+FP059
+FP135
+FP092
+FP198
+FP077
+NumMultBonds
+NumRotBonds
+NumAtoms
+NumOxygen
+NumHalogen
+NumNonHBonds
+FP176
+NumChlorine
+FP137
+FP205
+FP141
+NumAromaticBonds
+0
+200 400 600
+Importance
+0
+500
+1000
+Importance
+Fig. 8.24: A comparison of variable importance magnitudes for differing values
+of the bagging fraction and shrinkage parameters. Both tuning parameters
+are set to 0.1 in the left figure. Both are set to 0.9 in the right figure

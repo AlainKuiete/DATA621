@@ -1,0 +1,593 @@
+---
+title: 'Homework Assignment #1'
+author: "Alain Kuiete"
+date: "9/10/2020"
+output:
+  word_document: default
+  html_document: default
+---
+## INTRODUCTION
+Study of 2276 professionals baseball teams from 1871 to 2006. There are 16 variables where 15 are predictors.
+## DATA EXPLORATION
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(psych)
+library(DataExplorer)
+library(GGally)
+library(corrplot)
+library(DMwR)
+library(caret)
+library(VIM)
+library(glmnet)
+library(doParallel)
+library(xgboost) 
+library(mice)
+library(data.table)
+library(kableExtra)
+#Please add any new required packages here:
+```
+
+We can use the command read.csv to import the dataset and view the first six row with the command head().
+
+```{r}
+moneyball <- read.csv("/home/alain/Documents/DATA621/Assignment1/moneyball-training-data.csv")
+moneyball_eval <- read.csv("/home/alain/Documents/DATA621/Assignment1/moneyball-evaluation-data.csv")
+head(moneyball)
+```
+All the variables are numeric.
+The summary and describe function gives the univariate statistic of each variable. For each variable there are computation of minimun, maximun, mean, median, first and third quantiles. The describe function also include the standard deviation, the degree of skweness and the degree of kurtosis.
+For a quick univariate statistics  of the datasets, the function summary is convenient.
+```{r}
+summary(moneyball[,-1])
+```
+
+
+
+
+```{r}
+describe(moneyball[,-1])
+```
+All the variables are numeric
+There are missing values with variables TEAM_BATTING_SO, TEAM_BASERUN_SB, TEAM_BASERUN_CS, TEAM_BATTING_HBP,
+TEAM_PITCHING_SO, TEAM_FIELDING_DP.
+
+In This train dataset, the target variable, TARGET_WINS, varies from 0 to 146. 
+
+The median and the mean are closed in values or in the same magnitude except  TEAM_PITCHING_H where the mean is 200 time bigger than the median, TEAM_FIELDING_E where mean is also larger than median.
+
+```{r}
+str(moneyball)
+```
+The str function explain the structure of data frame.
+The data frame has 15 variables of type integer with 2276 observations
+
+
+```{r}
+dim(moneyball)
+```
+The histograms below allow the visualization of the distribution of each variable. 
+```{r}
+plot_histogram(moneyball[,-1], ggtheme=theme_light())
+```
+The TARGET_WINS which is the target variable present a normal distribution.The variables TEAM_PITCHING_H, TEAM_PITCHING_BB, and TEAM_PITCHING_SO have high degrees of skweness and kurtosis. These variable need to be log transformed before introducting in a model. 
+
+There are three bimodal distributions TEAM_BATTING_HR, TEAM_BATING_SO, AND REAM_PITCHING_HR
+
+```{r,warning=FALSE}
+ggplot(moneyball, aes(TARGET_WINS)) + geom_histogram(bins=30) + theme_classic()
+```
+Normal distribution of the target variable.
+
+```{r}
+par(mfrow = c(2,4))
+for (x in colnames(moneyball)[-1]){
+  boxplot(moneyball[,x],main=x)
+}
+```
+The boxplots of different variables add some visual information about  the outliers. Some variable distributions are skewed by to much outlierS in one side as TEAM_FIELDING_E, TEAM_PITCHING_H, TEAM_BASERUN_CS, and TEAM_BATING_HR. 
+
+```{r}
+library(e1071)
+apply(moneyball[,-1], 2, skewness)
+```
+#### 
+
+The aggr function in the VIM package plots and calculates the amount of missing values in each variable. The dply function is useful for wrangling data into aggregate summaries and is used to find the pattern of missing data related to the classes.
+```{r}
+aggr(moneyball[,-1], prop = c(TRUE, TRUE), bars=TRUE, numbers=TRUE, sortVars=TRUE)
+```
+TEAM_BATTING_HBP and  TEAM_BASERUN_CS have respectively  91.6% and 34% fo missing values in their respective column. Including those variable in the model imply an imputation of massive data in the model. We will exclude those variables from the model. 
+
+The correlations between variables in our training dataset are below.
+
+```{r}
+cor_moneyball <- cor(moneyball[,-1], use = "na.or.complete")
+corrplot(cor_moneyball, order = 'hclust', type = 'lower')
+```
+
+```{r}
+plot_correlation(moneyball[,-1])
+```
+There is no strong correlation between the target variable with other predictors.
+
+
+### Divers Correlations with TARGET_WINS
+```{r}
+plot_cor <- function(x, ...){
+  plot(TARGET_WINS~x, moneyball, ...)
+  abline(lm(TARGET_WINS~x, moneyball), col="red")
+}
+```
+
+```{r}
+par(mfrow=c(1,2))
+attach(moneyball)
+plot_cor(TEAM_BATTING_H, xlab="TEAM_BATTING_H")
+plot_cor(TEAM_BATTING_2B, xlab="TEAM_BATTING_2B")
+```
+
+
+
+### High correlated predictors
+```{r}
+ggplot(moneyball, aes(x=TEAM_PITCHING_H, y=TEAM_BATTING_H)) + 
+  geom_point() +  coord_cartesian(xlim=c(1000,30200), ylim=c(890, 2600)) 
+```
+
+There exist a trend in the relationship between  TEAM_BATTING_H and TEAM_PITCHING_H
+
+```{r}
+ggplot(moneyball, aes(x=TEAM_PITCHING_HR, y=TEAM_BATTING_HR)) + 
+  geom_point() +  coord_cartesian(xlim=c(0,350), ylim=c(0, 300)) 
+
+```
+The relation between TEAM_BATTING_HR and TEAM_PITCHING_H is strong enough even though there are multiple layers of linearities.
+
+
+```{r}
+ggplot(moneyball, aes(x=TEAM_PITCHING_BB, y=TEAM_BATTING_BB)) + 
+  geom_point() +  coord_cartesian(xlim=c(0,3700), ylim=c(0, 900)) 
+```
+TEAM_BATTING_BB and TEAM_PITCHING_BB could be collinear if we remove some outliers that leverage the relationship.
+
+```{r}
+ggplot(moneyball, aes(x=TEAM_PITCHING_SO, y=TEAM_BATTING_SO)) + 
+  geom_point() +  coord_cartesian(xlim=c(0,20000), ylim=c(0, 1400)) 
+```
+
+TEAM_BATTING_SO AND TEAM_PITCHING_SO are colinear at some levels.
+
+```{r}
+#moneyball.predictor <- moneyball[,-c(1,2)]
+#ggpairs(as.data.frame(moneyball.predictor), showStrips = FALSE)
+```
+
+## DATA PREPARATION
+### Remove the two variables with lot of  missing data
+```{r}
+moneyball_train <- moneyball[, -c(1,2,10,11)]
+```
+
+```{r}
+# MoneyBall <- moneyball[,-c(1,10,11)]
+# MoneyBall <-mice(MoneyBall, method="pmm", printFlag=FALSE, seed=6) 
+# 
+# aggr(complete(MoneyBall), prop = c(TRUE, TRUE), bars=TRUE, numbers=TRUE, sortVars=TRUE)
+```
+
+
+```{r}
+# moneyball_train2 <- MoneyBall[[1]]
+# describe(moneyball_train2)
+```
+
+```{r}
+# moneyball_train2 <- cbind(TARGET_WINS=moneyball[,"TARGET_WINS"],moneyball_train2)
+# moneyball_train2 <- moneyball_train2[1:n,]
+# moneyball_test2 <- moneyball_train2[n:m,]
+# 
+# head(moneyball_train2)
+```
+
+
+
+
+
+### Imputing the median in place of missing data
+```{r}
+library(dplyr)
+moneyball_train <- moneyball_train %>% 
+   mutate_all(~ifelse(is.na(.), median(., na.rm = TRUE), .))
+colSums(is.na(moneyball_train))
+```
+#### Splitting into train test dataset
+```{r}
+nrow <- dim(moneyball_train)[1]
+nsplit <- as.integer(nrow*.8)
+moneyball_train1 <- moneyball_train[1:nsplit,-c(1,10,11)]
+moneyball_test1 <- moneyball_train[nsplit:nrow,-c(10,11)]
+```
+
+```{r}
+
+```
+
+
+### Transforming the skewedvariables
+#### Look for lambda transformation
+
+```{r}
+library(caret)
+TEAM_FIELDING_E_Trans <- BoxCoxTrans(moneyball$TEAM_FIELDING_E)
+TEAM_FIELDING_E_Trans
+```
+
+```{r}
+#The original data
+par(mfrow=c(1,2))
+hist(moneyball$TEAM_FIELDING_E)
+# After transformation
+hist(predict(TEAM_FIELDING_E_Trans, moneyball$TEAM_FIELDING_E))
+```
+
+```{r}
+trans <- preProcess(moneyball_train,method = c("BoxCox", "center", "scale", "pca"))
+trans
+```
+
+```{r}
+# Apply the transformations:
+transformed <- predict(trans, moneyball_train)
+```
+
+```{r}
+head(moneyball_train)
+```
+
+
+```{r}
+predict(trans,moneyball_eval[,-c(1,9,10)])
+```
+
+
+
+```{r}
+plot_histogram(transformed, ggtheme=theme_light())
+```
+
+```{r}
+baseball_train <-cbind(TARGET_WINS = moneyball[,2], transformed)
+```
+
+```{r}
+
+```
+
+
+```{r}
+head(baseball_train)
+```
+
+
+
+```{r}
+transformed[1:6,1:5]
+```
+
+```{r}
+
+
+```
+
+```{r}
+#colSums(is.na(moneyballp))
+```
+
+
+
+## BUILD MODELS
+```{r}
+lm01 <- lm(TARGET_WINS~., moneyball_train1)
+summary(lm01)
+plot(lm01)
+```
+
+#### We remove the predictor with the highest p-value
+```{r}
+lm02 <- lm(TARGET_WINS~.-TEAM_BATTING_SO, moneyball_train1)
+summary(lm02)
+```
+
+
+
+
+
+```{r}
+
+```
+
+
+
+
+
+
+```{r}
+lm11 <- lm(TARGET_WINS~.-TEAM_PITCHING_H-TEAM_PITCHING_HR-TEAM_PITCHING_BB-TEAM_PITCHING_SO, moneyball_train1)
+summary(lm11)
+plot(lm11)
+```
+
+
+```{r}
+lm2 <- lm(TARGET_WINS~TEAM_BATTING_2B+TEAM_BATTING_H+TEAM_PITCHING_H+
+            TEAM_BATTING_HR+TEAM_PITCHING_HR+
+            TEAM_PITCHING_BB+TEAM_FIELDING_E , moneyball)
+summary(lm2)
+```
+```{r}
+lm3 <- lm(TARGET_WINS~TEAM_BATTING_2B+TEAM_BATTING_H+
+            TEAM_BATTING_HR+TEAM_BATTING_SO+
+            TEAM_BATTING_BB, moneyball)
+summary(lm3)
+```
+
+```{r}
+lm3 <- lm(TARGET_WINS~TEAM_BATTING_2B+TEAM_PITCHING_H+TEAM_PITCHING_HR+TEAM_PITCHING_SO+TEAM_PITCHING_BB, moneyball)
+summary(lm3)
+```
+
+```{r}
+lm2 <- lm(TARGET_WINS~TEAM_BATTING_2B+TEAM_BATTING_H+TEAM_PITCHING_H+
+            TEAM_BATTING_HR+TEAM_PITCHING_HR+TEAM_BATTING_SO+TEAM_PITCHING_SO+
+            TEAM_BATTING_BB+TEAM_PITCHING_BB, moneyball)
+summary(lm2)
+```
+
+
+
+### Tuning Linear Model
+
+
+
+```{r}
+
+```
+
+
+
+```{r}
+metric = 'RMSE'
+
+
+# Train control
+
+customTrainControl <- trainControl(method = "repeatedcv", 
+                                   number = 10, 
+                                   repeats = 5 ,
+                                   verboseIter = F)
+#Linear Model
+lmg <- train(TARGET_WINS ~ .,
+            moneyball_train1,
+            method= 'lm',
+            trControl = customTrainControl
+          )
+
+
+```
+
+
+```{r}
+lmg$results  
+lmg  #
+summary(lmg)
+par(mfrow=c(2,2))
+plot(lmg$finalModel)
+```
+
+
+```{r}
+
+```
+
+### Model for pca
+```{r}
+pcaModel <- lm(TARGET_WINS~.-PC3-PC7,transformed)
+summary(pcaModel)
+```
+
+```{r}
+predict(pcaModel)
+```
+
+
+
+```{r}
+#names(summary(model))
+```
+
+### Foward Selection
+#### Impact of each predictor on the outcome
+
+
+```{r}
+predictors_validation <- function(x, ...){
+  par(mar=c(2,2,1,1), mfrow=c(3,2))
+  plot(TARGET_WINS~x, moneyball, ...)
+  model <- lm(TARGET_WINS~x, moneyball)
+  abline(model, col="red")
+  hist(model$residuals)
+  plot(model)
+}
+
+```
+
+
+```{r}
+predictors_validation(TEAM_BATTING_H, main ="WINS vs TEAM_BATTING_H")
+```
+
+```{r}
+predictors_validation(TEAM_BATTING_2B, main ="WINS vs TEAM_BATTING_2B")
+```
+
+
+```{r}
+predictors_validation(TEAM_BATTING_3B, main ="WINS vs TEAM_BATTING_3B")
+```
+
+
+```{r}
+predictors_validation(TEAM_BATTING_HR, main ="WINS vs TEAM_BATTING_HR")
+```
+There is nodifference between the plot and the fiited .The model diddint get anything from the data
+
+```{r}
+predictors_validation(TEAM_BATTING_BB, main ="WINS vs TEAM_BATTING_BB")
+```
+
+
+```{r}
+predictors_validation(TEAM_BATTING_HBP, main ="WINS vs TEAM_BATTING_HBP")
+```
+
+
+
+```{r}
+predictors_validation(TEAM_BATTING_SO, main ="WINS vs TEAM_BATTING_SO")
+```
+
+
+```{r}
+predictors_validation(TEAM_BASERUN_SB, main ="WINS vs TEAM_BASERUN_SB")
+```
+
+
+
+```{r}
+predictors_validation(TEAM_BASERUN_CS, main ="WINS vs TEAM_BASERUN_CS")
+```
+
+
+```{r}
+predictors_validation(TEAM_FIELDING_E, main ="WINS vs TEAM_FIELDING_E")
+```
+
+
+
+```{r}
+predictors_validation(TEAM_FIELDING_DP, main ="WINS vs TEAM_FIELDING_DP")
+```
+
+
+
+```{r}
+predictors_validation(TEAM_PITCHING_BB, main ="WINS vs TEAM_PITCHING_BB")
+```
+
+
+```{r}
+predictors_validation(TEAM_PITCHING_H, main ="WINS vs TEAM_PITCHING_H")
+```
+
+
+```{r}
+predictors_validation(TEAM_PITCHING_HR, main ="WINS vs TEAM_PITCHING_HR")
+```
+
+
+
+```{r}
+predictors_validation(TEAM_PITCHING_SO, main ="WINS vs TEAM_PITCHING_SO")
+```
+
+
+```{r}
+adj.rsq <- NULL
+for (x in colnames(moneyball_train)) {
+  model <- lm(TARGET_WINS~moneyball_train[,x], moneyball_train)
+  adj.rsq <- c(adj.rsq, summary(model)$adj.r.squared)
+}
+names(adj.rsq) <- colnames(moneyball_train)  
+adj.rsq
+
+```
+
+#### Foward selection
+We add one predictor at the time and observe the change in adjusted r_squared. If the r_squared increases, we keep the predictor, otherwise we remove that predictor.
+
+```{r}
+foward.selection.model <- lm(TARGET_WINS~TEAM_BATTING_H+TEAM_BATTING_2B+TEAM_BATTING_BB+TEAM_FIELDING_E+
+                            TEAM_BATTING_HR+TEAM_PITCHING_HR+TEAM_BATTING_3B+TEAM_BASERUN_SB+
+                            TEAM_PITCHING_H+TEAM_BATTING_SO+TEAM_PITCHING_BB+TEAM_PITCHING_SO+
+                              TEAM_FIELDING_DP, moneyball_train)
+```
+
+```{r}
+foward.selection.model <- lm(TARGET_WINS~TEAM_BATTING_H+TEAM_BATTING_2B+TEAM_BATTING_BB+TEAM_PITCHING_HR+
+                             TEAM_FIELDING_E+TEAM_BATTING_3B+TEAM_BASERUN_SB+
+                               TEAM_PITCHING_H+TEAM_PITCHING_SO+TEAM_FIELDING_DP, moneyball_train)
+```
+
+
+```{r}
+summary(foward.selection.model)$adj.r.squared
+```
+```{r}
+summary(foward.selection.model)
+```
+
+```{r}
+
+```
+
+
+## SELECT MODELS
+
+
+```{r}
+# Train data Test set 
+X_test <- moneyball_test1[,-1] # Dropped TARGET_WINS
+Y_test <- moneyball_test1[,1] # Only TARGET_WINS
+
+test_model <- function(modelName,predData){
+options(warn=-1)      #turn off warnings
+predicted_result <- predict(modelName, predData)
+options(warn=1)  
+
+#We can collect the observed and predicted values into a data frame, then use
+# the caret function defaultSummary to estimate the test set performance
+DT_model_lm_pred <- data.frame(obs=Y_test,pred=predicted_result)
+res_sum <- defaultSummary(DT_model_lm_pred)
+mape_score <- MLmetrics::MAPE(predicted_result,Y_test)
+return(cbind(res_sum,mape_score))
+}
+
+kable(list(test_model(lmg,X_test)
+      ))
+```
+
+
+```{r}
+mape_score <- MLmetrics::MAPE(predict(lmg, moneyball_train1),moneyball_test1[,1])
+test_model(lmg,moneyball_test1)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
