@@ -2,7 +2,9 @@
 title: "DATA 621 Homework 1"
 author: "Alain Kuiete"
 date: "9/24/2020"
-output: html_document
+output:
+  word_document: default
+  html_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -35,7 +37,7 @@ library(kableExtra)
 
 We can use the command read.csv to import the dataset and view the first six row with the command head().
 
-```{r}
+```{r paged.print=TRUE}
 moneyball <- read.csv("/home/alain/Documents/DATA621/Assignment1/moneyball-training-data.csv")
 moneyball_eval <- read.csv("/home/alain/Documents/DATA621/Assignment1/moneyball-evaluation-data.csv")
 head(moneyball)
@@ -69,21 +71,21 @@ anyNA(moneyball_eval_t2)
 ```
 
 ```{r}
-moneyball_trans2 <- preProcess(moneyball_train2, method = c("BoxCox", "center", "scale", "pca"))
-moneyball_trans2
+moneyball_trans <- preProcess(moneyball_train, method = c("BoxCox", "center", "scale", "pca"))
+moneyball_trans
 ```
 
 ```{r}
 # Apply the transformations:
-moneyball_transformed2 <- predict(moneyball_trans2, moneyball_train2)
-head(moneyball_transformed2)
+moneyball_transformed <- predict(moneyball_trans, moneyball_train)
+head(moneyball_transformed)
 ```
 
 
 ```{r}
 # Apply the transformations:
-moneyball_eval_tr2 <- predict(moneyball_trans2, moneyball_eval_t2)
-head(moneyball_eval_tr2)
+moneyball_eval_tr <- predict(moneyball_trans, moneyball_eval_t)
+head(moneyball_eval_tr)
 ```
 
 #### By default, the numbers are returned as a list. Using
@@ -97,13 +99,13 @@ trainingRows <- createDataPartition(moneyball$TARGET_WINS, p = .80, list= FALSE)
 #### Subset the data into objects for training using
 #### integer sub-setting.
 ```{r}
-trainPredictors2 <- moneyball_transformed2[trainingRows, ]
+trainPredictors <- moneyball_transformed[trainingRows, ]
 trainTARGET_WINS <- moneyball$TARGET_WINS[trainingRows]
 ```
 
 ##### Do the same for the test set using negative integers.
 ```{r}
-testPredictors2 <- moneyball_transformed2[-trainingRows, ]
+testPredictors <- moneyball_transformed[-trainingRows, ]
 testTARGET_WINS <- moneyball$TARGET_WINS[-trainingRows]
 
 ```
@@ -112,26 +114,108 @@ testTARGET_WINS <- moneyball$TARGET_WINS[-trainingRows]
 ```{r}
 set.seed(130)
 ctrl <- trainControl(method = "cv", number = 10)
-lmFit1 <- train(trainPredictors2, trainTARGET_WINS, method = "lm", trControl = ctrl)
+lmFit1 <- train(trainPredictors, trainTARGET_WINS, method = "lm", trControl = ctrl)
 lmFit1
 ```
 
 
 ```{r}
-lmPred1 <- predict(lmFit1, testPredictors2)
+lmPred1 <- predict(lmFit1, testPredictors)
 head(lmPred1)
 ```
+
 ```{r}
 lmValues1 <- data.frame(obs = testTARGET_WINS, pred = lmPred1)
 defaultSummary(lmValues1)
 ```
 
+## Another Linear Models
+#### By default, the numbers are returned as a list. Using
+#### list = FALSE, a matrix of row numbers is generated.
+#### These samples are allocated to the training set.
+```{r}
+trainingRows <- createDataPartition(moneyball$TARGET_WINS, p = .80, list= FALSE)
+```
+
+
+#### Subset the data into objects for training using
+#### integer sub-setting.
+```{r}
+trainPredictors <- moneyball_train2[trainingRows, ]
+trainTARGET_WINS <- moneyball$TARGET_WINS[trainingRows]
+```
+
+##### Do the same for the test set using negative integers.
+```{r}
+testPredictors <- moneyball_train2[-trainingRows, ]
+testTARGET_WINS <- moneyball$TARGET_WINS[-trainingRows]
+
+```
+
+```{r}
+train.models <- cbind(TARGET_WINS = trainTARGET_WINS, trainPredictors)
+head(train.models)
+```
 
 
 
+```{r}
+model2 <- lm(TARGET_WINS~TEAM_BATTING_H+TEAM_BATTING_2B+TEAM_BATTING_BB+TEAM_PITCHING_HR+
+                             TEAM_FIELDING_E+TEAM_BATTING_3B+TEAM_BASERUN_SB+
+                               TEAM_PITCHING_H+TEAM_PITCHING_SO+TEAM_FIELDING_DP, train.models)
+```
 
 
+```{r}
+summary(model2)
+```
 
+
+```{r}
+lmValues1 <- data.frame(obs = testTARGET_WINS, pred = predict(model2, testPredictors))
+defaultSummary(lmValues1)
+```
+
+```{r}
+moneyball.eval.r <- predict(model2,moneyball_eval_t2)
+moneyball.eval.r <- cbind(INDEX = moneyball_eval$INDEX, TARGET_WINS = moneyball.eval.r,
+                          moneyball_eval[,-c(1)])
+head(moneyball.eval.r)
+```
+
+```{r}
+#write.csv(file = "/home/alain/Documents/DATA621/Assignment1/moneyball_predict", moneyball.eval.r)
+```
+
+
+```{r}
+metric = 'RMSE'
+
+
+# Train control
+
+customTrainControl <- trainControl(method = "repeatedcv", 
+                                   number = 10, 
+                                   repeats = 5 ,
+                                   verboseIter = F)
+#Linear Model
+lmg <- train(TARGET_WINS ~ .,
+            train.models,
+            method= 'lm',
+            trControl = customTrainControl
+          )
+
+
+```
+
+
+```{r}
+lmg$results  
+lmg  #
+summary(lmg)
+par(mfrow=c(2,2))
+plot(lmg$finalModel)
+```
 
 
 

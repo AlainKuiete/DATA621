@@ -358,32 +358,32 @@ summary(lm2)
 
 
 ```{r}
-metric = 'RMSE'
-
-
-# Train control
-
-customTrainControl <- trainControl(method = "repeatedcv", 
-                                   number = 10, 
-                                   repeats = 5 ,
-                                   verboseIter = F)
-#Linear Model
-lmg <- train(TARGET_WINS ~ .,
-            moneyball_train1,
-            method= 'lm',
-            trControl = customTrainControl
-          )
+# metric = 'RMSE'
+# 
+# 
+# # Train control
+# 
+# customTrainControl <- trainControl(method = "repeatedcv", 
+#                                    number = 10, 
+#                                    repeats = 5 ,
+#                                    verboseIter = F)
+# #Linear Model
+# lmg <- train(TARGET_WINS ~ .,
+#             moneyball_train1,
+#             method= 'lm',
+#             trControl = customTrainControl
+#           )
 
 
 ```
 
 
 ```{r}
-lmg$results  
-lmg  #
-summary(lmg)
-par(mfrow=c(2,2))
-plot(lmg$finalModel)
+# lmg$results  
+# lmg  #
+# summary(lmg)
+# par(mfrow=c(2,2))
+# plot(lmg$finalModel)
 ```
 
 
@@ -434,72 +434,72 @@ predictors_validation(TEAM_BATTING_2B, main ="WINS vs TEAM_BATTING_2B")
 
 
 ```{r}
-predictors_validation(TEAM_BATTING_3B, main ="WINS vs TEAM_BATTING_3B")
+# predictors_validation(TEAM_BATTING_3B, main ="WINS vs TEAM_BATTING_3B")
 ```
 
 
 ```{r}
-predictors_validation(TEAM_BATTING_HR, main ="WINS vs TEAM_BATTING_HR")
+# predictors_validation(TEAM_BATTING_HR, main ="WINS vs TEAM_BATTING_HR")
 ```
 There is nodifference between the plot and the fiited .The model diddint get anything from the data
 
 ```{r}
-predictors_validation(TEAM_BATTING_BB, main ="WINS vs TEAM_BATTING_BB")
+# predictors_validation(TEAM_BATTING_BB, main ="WINS vs TEAM_BATTING_BB")
 ```
 
 
 ```{r}
-predictors_validation(TEAM_BATTING_HBP, main ="WINS vs TEAM_BATTING_HBP")
-```
-
-
-
-```{r}
-predictors_validation(TEAM_BATTING_SO, main ="WINS vs TEAM_BATTING_SO")
-```
-
-
-```{r}
-predictors_validation(TEAM_BASERUN_SB, main ="WINS vs TEAM_BASERUN_SB")
+# predictors_validation(TEAM_BATTING_HBP, main ="WINS vs TEAM_BATTING_HBP")
 ```
 
 
 
 ```{r}
-predictors_validation(TEAM_BASERUN_CS, main ="WINS vs TEAM_BASERUN_CS")
+# predictors_validation(TEAM_BATTING_SO, main ="WINS vs TEAM_BATTING_SO")
 ```
 
 
 ```{r}
-predictors_validation(TEAM_FIELDING_E, main ="WINS vs TEAM_FIELDING_E")
-```
-
-
-
-```{r}
-predictors_validation(TEAM_FIELDING_DP, main ="WINS vs TEAM_FIELDING_DP")
+# predictors_validation(TEAM_BASERUN_SB, main ="WINS vs TEAM_BASERUN_SB")
 ```
 
 
 
 ```{r}
-predictors_validation(TEAM_PITCHING_BB, main ="WINS vs TEAM_PITCHING_BB")
+# predictors_validation(TEAM_BASERUN_CS, main ="WINS vs TEAM_BASERUN_CS")
 ```
 
 
 ```{r}
-predictors_validation(TEAM_PITCHING_H, main ="WINS vs TEAM_PITCHING_H")
-```
-
-
-```{r}
-predictors_validation(TEAM_PITCHING_HR, main ="WINS vs TEAM_PITCHING_HR")
+# predictors_validation(TEAM_FIELDING_E, main ="WINS vs TEAM_FIELDING_E")
 ```
 
 
 
 ```{r}
-predictors_validation(TEAM_PITCHING_SO, main ="WINS vs TEAM_PITCHING_SO")
+# predictors_validation(TEAM_FIELDING_DP, main ="WINS vs TEAM_FIELDING_DP")
+```
+
+
+
+```{r}
+# predictors_validation(TEAM_PITCHING_BB, main ="WINS vs TEAM_PITCHING_BB")
+```
+
+
+```{r}
+# predictors_validation(TEAM_PITCHING_H, main ="WINS vs TEAM_PITCHING_H")
+```
+
+
+```{r}
+# predictors_validation(TEAM_PITCHING_HR, main ="WINS vs TEAM_PITCHING_HR")
+```
+
+
+
+```{r}
+# predictors_validation(TEAM_PITCHING_SO, main ="WINS vs TEAM_PITCHING_SO")
 ```
 
 
@@ -534,6 +534,7 @@ foward.selection.model <- lm(TARGET_WINS~TEAM_BATTING_H+TEAM_BATTING_2B+TEAM_BAT
 ```{r}
 summary(foward.selection.model)$adj.r.squared
 ```
+
 ```{r}
 summary(foward.selection.model)
 ```
@@ -547,31 +548,30 @@ summary(foward.selection.model)
 
 
 ```{r}
-# Train data Test set 
-X_test <- moneyball_test1[,-1] # Dropped TARGET_WINS
-Y_test <- moneyball_test1[,1] # Only TARGET_WINS
-
-test_model <- function(modelName,predData){
-options(warn=-1)      #turn off warnings
-predicted_result <- predict(modelName, predData)
-options(warn=1)  
-
-#We can collect the observed and predicted values into a data frame, then use
-# the caret function defaultSummary to estimate the test set performance
-DT_model_lm_pred <- data.frame(obs=Y_test,pred=predicted_result)
-res_sum <- defaultSummary(DT_model_lm_pred)
-mape_score <- MLmetrics::MAPE(predicted_result,Y_test)
-return(cbind(res_sum,mape_score))
-}
-
-kable(list(test_model(lmg,X_test)
-      ))
+# # Train data Test set 
+# X_test <- moneyball_test1[,-1] # Dropped TARGET_WINS
+# Y_test <- moneyball_test1[,1] # Only TARGET_WINS
+# 
+# test_model <- function(modelName,predData){
+# options(warn=-1)      #turn off warnings
+# predicted_result <- predict(modelName, predData)
+# options(warn=1)  
+# 
+# #We can collect the observed and predicted values into a data frame, then use
+# # the caret function defaultSummary to estimate the test set performance
+# DT_model_lm_pred <- data.frame(obs=Y_test,pred=predicted_result)
+# res_sum <- defaultSummary(DT_model_lm_pred)
+# return(res_sum)
+# }
+# test_model(lmg, X_test)
+# # kable(list(test_model(lmg,X_test)
+# #       ))
 ```
 
 
 ```{r}
-mape_score <- MLmetrics::MAPE(predict(lmg, moneyball_train1),moneyball_test1[,1])
-test_model(lmg,moneyball_test1)
+# mape_score <- MLmetrics::MAPE(predict(lmg, moneyball_train1),moneyball_test1[,1])
+# test_model(lmg,moneyball_test1)
 ```
 
 
