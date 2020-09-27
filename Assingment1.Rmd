@@ -120,6 +120,11 @@ lmFit1
 
 
 ```{r}
+summary(lmFit1)
+```
+
+
+```{r}
 lmPred1 <- predict(lmFit1, testPredictors)
 head(lmPred1)
 ```
@@ -183,9 +188,6 @@ moneyball.eval.r <- cbind(INDEX = moneyball_eval$INDEX, TARGET_WINS = moneyball.
 head(moneyball.eval.r)
 ```
 
-```{r}
-#write.csv(file = "/home/alain/Documents/DATA621/Assignment1/moneyball_predict", moneyball.eval.r)
-```
 
 
 ```{r}
@@ -221,6 +223,9 @@ plot(lmg$finalModel)
 
 
 
+```{r}
+write.csv(file = "/home/alain/Documents/DATA621/Assignment1/moneyball_predict.csv", moneyball.eval.r)
+```
 
 
 
